@@ -1,0 +1,14 @@
+[package]
+name = "gamma_correction_sdl2"
+version = "0.1.0"
+authors = ["Henning Ottesen <henning@live.no>"]
+
+#[target.'cfg(target_pointer_width = "64")']
+include = ["/mingw64/bin/SDL2.dll"]
+
+[dependencies]
+palette = "0.2"
+
+[dependencies.sdl2]
+features = ["use-pkgconfig"]
+version = "0.20"
