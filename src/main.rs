@@ -73,6 +73,9 @@ fn handle_events(event_pump: &mut EventPump, gamma: &mut f32) -> bool {
             },
             Event::KeyDown { keycode: Some(Keycode::Down), .. } => {
                 *gamma -= 0.05;
+                if *gamma < 0.0 {
+                    *gamma = 0.0;
+                }
                 println!("Gamma:{}", *gamma);
             },
             _ => {}
@@ -85,8 +88,9 @@ fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
     renderer.set_draw_color(Color::RGB(0, 0, 0));
     renderer.clear();
 
-    let lookup: Vec<u8> = (0..255).map(|i| {
-        let c = GammaRgb::new_u8(i, i, i, gamma).to_linear();
+    let lookup: Vec<u8> = (0..256).map(|i| {
+        let j = i as u8;
+        let c = GammaRgb::new_u8(j, j, j, gamma).to_linear();
         let pxl: [u8; COLOR_BYTES] = c.to_pixel();
         pxl[0]
     }).collect();
@@ -94,8 +98,8 @@ fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
     texture.with_lock(None, |buffer: &mut [u8], _| {
         let clines = buffer.chunks_mut(LINE_SIZE * BAR_HEIGHT);
         for cline in clines.zip(0..4) {
-            for line in cline.0.chunks_mut(LINE_SIZE).enumerate() {                
-                let rep = Repeater::new(0..255, BAR_PXL_WIDTH);
+            for line in cline.0.chunks_mut(LINE_SIZE).enumerate() {
+                let rep = Repeater::new(0..256, BAR_PXL_WIDTH);
                 for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
                     let c = lookup[pxl.1];
                     match cline.1 {
