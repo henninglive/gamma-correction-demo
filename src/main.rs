@@ -7,6 +7,7 @@ use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::render::Renderer;
 use sdl2::render::Texture;
+use sdl2::pixels::Color;
 
 use palette::pixel::GammaRgb;
 
@@ -16,9 +17,7 @@ const COLOR_BYTES: usize = 3;
 const LINE_SIZE: usize = COLOR_BYTES * SCREEN_WIDTH;
 
 const BAR_PXL_WIDTH: usize = 4;
-const BAR_HEIGHT: usize = 50;
-const BAR_SPACING: usize = 20;
-
+const BAR_HEIGHT: usize = 100;
 
 pub struct Repeater<I : Iterator> {
     repeats: usize,
@@ -83,43 +82,28 @@ fn handle_events(event_pump: &mut EventPump, gamma: &mut f32) -> bool {
 }
 
 fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
+    renderer.set_draw_color(Color::RGB(0, 0, 0));
+    renderer.clear();
+
+    let lookup: Vec<u8> = (0..255).map(|i| {
+        let c = GammaRgb::new_u8(i, i, i, gamma).to_linear();
+        let pxl: [u8; COLOR_BYTES] = c.to_pixel();
+        pxl[0]
+    }).collect();
+
     texture.with_lock(None, |buffer: &mut [u8], _| {
-
-        let clines = buffer.chunks_mut(
-            LINE_SIZE *(BAR_SPACING + BAR_HEIGHT));
-
+        let clines = buffer.chunks_mut(LINE_SIZE * BAR_HEIGHT);
         for cline in clines.zip(0..4) {
-            for line in cline.0.chunks_mut(LINE_SIZE).enumerate() {
+            for line in cline.0.chunks_mut(LINE_SIZE).enumerate() {                
                 let rep = Repeater::new(0..255, BAR_PXL_WIDTH);
-
-                if line.0 <= BAR_SPACING {
-                    for pxl in line.1.chunks_mut(COLOR_BYTES) {                        
-                        let npxl: [u8; 3] = [0, 0, 0];
-                        pxl.clone_from_slice(&npxl);
-                    }
-                } else if cline.1 == 0 {
-                    for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
-                        let c = GammaRgb::new_u8(pxl.1, pxl.1, pxl.1, gamma).to_linear();
-                        let npxl: [u8; COLOR_BYTES] = c.to_pixel();
-                        pxl.0.clone_from_slice(&npxl);
-                    }
-                } else if cline.1 == 1 {
-                    for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
-                        let c = GammaRgb::new_u8(pxl.1, 0, 0, gamma).to_linear();
-                        let npxl: [u8; COLOR_BYTES] = c.to_pixel();
-                        pxl.0.clone_from_slice(&npxl);
-                    }
-                } else if cline.1 == 2 {
-                    for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
-                        let c = GammaRgb::new_u8(0, pxl.1, 0, gamma).to_linear();
-                        let npxl: [u8; COLOR_BYTES] = c.to_pixel();
-                        pxl.0.clone_from_slice(&npxl);
-                    }
-                } else if cline.1 == 3 {
-                    for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
-                        let c = GammaRgb::new_u8(0, 0, pxl.1, gamma).to_linear();
-                        let npxl: [u8; COLOR_BYTES] = c.to_pixel();
-                        pxl.0.clone_from_slice(&npxl);
+                for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
+                    let c = lookup[pxl.1];
+                    match cline.1 {
+                        0 => pxl.0.clone_from_slice(&[c, c, c]),
+                        1 => pxl.0.clone_from_slice(&[c, 0, 0]),
+                        2 => pxl.0.clone_from_slice(&[0, c, 0]),
+                        3 => pxl.0.clone_from_slice(&[0, 0, c]),
+                        _ => {}
                     }
                 }
             }
@@ -130,6 +114,10 @@ fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
 }
 
 fn main() {
+    if (BAR_PXL_WIDTH * 256 > SCREEN_WIDTH) ||  (BAR_HEIGHT * 4 > SCREEN_HEIGHT) {
+        panic!("Invalid resolution");
+    }
+
     let sdl    = sdl2::init().unwrap();
     let video  = sdl.video().unwrap();
     let window = video.window("Color Palette SDL2", 
@@ -146,7 +134,6 @@ fn main() {
         SCREEN_HEIGHT as u32).unwrap();
 
     let mut event_pump = sdl.event_pump().unwrap();
-
     while !handle_events(&mut event_pump, &mut gamma) {
         draw(&mut renderer, &mut texture, gamma);
     }
