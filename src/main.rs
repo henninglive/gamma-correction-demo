@@ -102,12 +102,21 @@ fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
                 let rep = Repeater::new(0..256, BAR_PXL_WIDTH);
                 for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
                     let c = lookup[pxl.1];
+
                     match cline.1 {
                         0 => pxl.0.clone_from_slice(&[c, c, c]),
                         1 => pxl.0.clone_from_slice(&[c, 0, 0]),
                         2 => pxl.0.clone_from_slice(&[0, c, 0]),
                         3 => pxl.0.clone_from_slice(&[0, 0, c]),
                         _ => {}
+                    }
+
+                    let l = cline.1 * BAR_HEIGHT + line.0;
+                    let p = (((255 - c) as f32 / 255.0) * (4 * BAR_HEIGHT) as f32) as usize;
+                    if l == p {
+                        for c in pxl.0.iter_mut() {
+                            *c = std::u8::MAX - *c;
+                        }
                     }
                 }
             }
@@ -118,7 +127,7 @@ fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
 }
 
 fn main() {
-    if (BAR_PXL_WIDTH * 256 > SCREEN_WIDTH) ||  (BAR_HEIGHT * 4 > SCREEN_HEIGHT) {
+    if (BAR_PXL_WIDTH * 256 != SCREEN_WIDTH) ||  (BAR_HEIGHT * 4 != SCREEN_HEIGHT) {
         panic!("Invalid resolution");
     }
 
