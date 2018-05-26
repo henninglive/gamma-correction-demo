@@ -1,15 +1,15 @@
 extern crate sdl2;
-extern crate palette;
 
 use sdl2::EventPump;
 use sdl2::pixels::PixelFormatEnum;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
-use sdl2::render::Renderer;
+use sdl2::render::Canvas;
 use sdl2::render::Texture;
+use sdl2::video::Window;
 use sdl2::pixels::Color;
 
-use palette::pixel::GammaRgb;
+use std::iter;
 
 const SCREEN_WIDTH: usize = 1024;
 const SCREEN_HEIGHT: usize = 400;
@@ -18,48 +18,6 @@ const LINE_SIZE: usize = COLOR_BYTES * SCREEN_WIDTH;
 
 const BAR_PXL_WIDTH: usize = 4;
 const BAR_HEIGHT: usize = 100;
-
-pub struct Repeater<I : Iterator> {
-    repeats: usize,
-    counter: usize,
-    item: Option<I::Item>,
-    iter: I
-}
-
-impl<I : Iterator> Repeater<I> {
-    pub fn new(iter: I, repeats: usize) -> Repeater<I> {
-        Repeater {
-            repeats: repeats,
-            counter: 0,
-            item: None,
-            iter: iter
-        }
-    }
-}
-
-impl<I : Iterator> Iterator for Repeater<I> where I::Item: Clone {
-    type Item = I::Item;
-    fn next(&mut self) -> Option<I::Item> {
-        //restart counter and get next item
-        if self.counter == 0 {
-            self.counter = self.repeats;
-            self.item = self.iter.next();
-        }
-
-        self.counter -= 1;
-
-        //return orginal item on last repeat
-        if self.counter == 0 {
-            return self.item.take();
-        }
-
-        //return copy of current item
-        match self.item {
-            Some(ref item) => Some(item.clone()),
-            None => None,
-        }
-    }
-}
 
 fn handle_events(event_pump: &mut EventPump, gamma: &mut f32) -> bool {
     for event in event_pump.poll_iter() {
@@ -84,25 +42,25 @@ fn handle_events(event_pump: &mut EventPump, gamma: &mut f32) -> bool {
     false
 }
 
-fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
-    renderer.set_draw_color(Color::RGB(0, 0, 0));
-    renderer.clear();
+fn draw(canvas: &mut Canvas<Window>, texture: &mut Texture, gamma: f32){
+    canvas.set_draw_color(Color::RGB(0, 0, 0));
+    canvas.clear();
 
-    let lookup: Vec<u8> = (0..256).map(|i| {
-        let j = i as u8;
-        let c = GammaRgb::new_u8(j, j, j, gamma).to_linear();
-        let pxl: [u8; COLOR_BYTES] = c.to_pixel();
-        pxl[0]
+    let lookup: Vec<u8> = (0usize..256).map(|i| {
+        let mut g = 255.0 * ((i as f32) / 255.0).powf(gamma);
+        if g < 0.0 { g = 0.0; }
+        if g > 255.0 { g = 255.0; }
+        g as u32 as u8
     }).collect();
 
     texture.with_lock(None, |buffer: &mut [u8], _| {
         let clines = buffer.chunks_mut(LINE_SIZE * BAR_HEIGHT);
         for cline in clines.zip(0..4) {
             for line in cline.0.chunks_mut(LINE_SIZE).enumerate() {
-                let rep = Repeater::new(0..256, BAR_PXL_WIDTH);
-                for pxl in line.1.chunks_mut(COLOR_BYTES).zip(rep) {
-                    let c = lookup[pxl.1];
-
+                for pxl in line.1.chunks_mut(COLOR_BYTES).zip((0..256usize)
+                    .flat_map(|i| iter::repeat(i).take(BAR_PXL_WIDTH)))
+                {
+                    let c = lookup[pxl.1 as usize];
                     match cline.1 {
                         0 => pxl.0.clone_from_slice(&[c, c, c]),
                         1 => pxl.0.clone_from_slice(&[c, 0, 0]),
@@ -122,8 +80,8 @@ fn draw(renderer: &mut Renderer, texture: &mut Texture, gamma: f32){
             }
         }
     }).unwrap();
-    renderer.copy(&texture, None, None);
-    renderer.present();
+    canvas.copy(&texture, None, None).unwrap();
+    canvas.present();
 }
 
 fn main() {
@@ -141,13 +99,14 @@ fn main() {
         .unwrap();
 
     let mut gamma = 1.0;
-    let mut renderer = window.renderer().build().unwrap();
-    let mut texture = renderer.create_texture_streaming(
+    let mut canvas = window.into_canvas().build().unwrap();
+    let texture_creator = canvas.texture_creator();
+    let mut texture = texture_creator.create_texture_streaming(
         PixelFormatEnum::RGB24, SCREEN_WIDTH as u32, 
         SCREEN_HEIGHT as u32).unwrap();
 
     let mut event_pump = sdl.event_pump().unwrap();
     while !handle_events(&mut event_pump, &mut gamma) {
-        draw(&mut renderer, &mut texture, gamma);
+        draw(&mut canvas, &mut texture, gamma);
     }
 }
