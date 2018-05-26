@@ -91,7 +91,7 @@ fn main() {
 
     let sdl    = sdl2::init().unwrap();
     let video  = sdl.video().unwrap();
-    let window = video.window("Color Palette SDL2", 
+    let window = video.window("gamma-correction-demo", 
         SCREEN_WIDTH as u32, SCREEN_HEIGHT as u32)
         .position_centered()
         .opengl()
